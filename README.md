@@ -32,7 +32,7 @@ Revenue Cockpit sits between the retained base and the cash, and connects to bot
 
 ## Part of an operations ecosystem
 
-Revenue Cockpit is one of five control surfaces for a single multi-hub operation, built to follow one decision down the whole chain — *from the shift being covered to the cash being collected*:
+Revenue Cockpit is one of six control surfaces for a single multi-hub operation, built to follow one decision down the whole chain — *from the shift being covered to the cash being collected*:
 
 | Stage | Tool | The question it answers |
 |---|---|---|
