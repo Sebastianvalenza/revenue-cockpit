@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Revenue Cockpit</title>
+<meta name="description" content="Regional revenue & sales-forecast cockpit — quota attainment by region, region & manager comparison, pipeline by stage and end-of-quarter forecast. Runs fully client-side on synthetic data.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Spline+Sans+Mono:wght@400;500;600&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   DESIGN TOKENS — shared ecosystem identity (dark + light)
+   Identical token set to VIP Performance Tracker, Shift Planner
+   and Ticket Triage.
+   ============================================================ */
+:root{
+  --bg:#0a0c10; --panel:#12161d; --panel2:#171c25; --panel3:#0f1319;
+  --line:#252c38; --line2:#1c222c;
+  --txt:#e6e9ef; --muted:#8a93a3; --dim:#5f6877;
+  --acid:#c4f042; --acid-fill:#c4f042; --blue:#6ea8ff; --amber:#ffb347; --red:#ff6b5e; --violet:#b89dff; --teal:#5dcaa5;
+  --grid:#1c222c; --thumb:rgba(196,240,66,.12);
+  --shadow:0 8px 30px rgba(0,0,0,.45);
+  --ok:#c4f042; --warn:#ffb347; --bad:#ff6b5e;
+}
+[data-theme="light"]{
+  --bg:#f3f5f8; --panel:#ffffff; --panel2:#eef1f5; --panel3:#f7f9fb;
+  --line:#e2e6ec; --line2:#edf0f4;
+  --txt:#161a20; --muted:#5a6472; --dim:#8893a2;
+  --acid:#5f7d12; --acid-fill:#a9d12e; --blue:#2f6fd0; --amber:#c87f12; --red:#d8463a; --violet:#7a5cf0; --teal:#1d9e75;
+  --grid:#e6eaf0; --thumb:rgba(95,125,18,.12);
+  --shadow:0 8px 24px rgba(20,30,50,.08);
+  --ok:#5f7d12; --warn:#c87f12; --bad:#d8463a;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:'Archivo',sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  transition:background .3s ease,color .3s ease;
+  background-image:radial-gradient(circle at 12% -8%,rgba(196,240,66,.05),transparent 38%),radial-gradient(circle at 92% 4%,rgba(110,168,255,.04),transparent 34%);}
+.mono{font-family:'Spline Sans Mono',monospace}
+.serif{font-family:'Fraunces',serif}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 26px 70px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.k{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+a{color:var(--blue);text-decoration:none}
+::selection{background:var(--thumb)}
+
+/* header */
+.appbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:34px;height:34px;border-radius:8px;background:var(--acid-fill);color:#0a0c10;display:flex;align-items:center;justify-content:center;font-weight:600;font-family:'Spline Sans Mono';font-size:18px}
+.brand h1{font-family:'Fraunces',serif;font-weight:600;font-size:21px;line-height:1}
+.brand .sub{font-family:'Spline Sans Mono';font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-top:3px}
+.toprt{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{font-family:'Spline Sans Mono';font-size:11px;padding:8px 13px;background:transparent;border:none;color:var(--muted);cursor:pointer;transition:.15s;border-left:1px solid var(--line)}
+.seg button:first-child{border-left:none}
+.seg button.on{background:var(--thumb);color:var(--acid)}
+.iconbtn{border:1px solid var(--line);background:var(--panel);border-radius:9px;width:38px;height:36px;color:var(--muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:.15s}
+.iconbtn:hover{border-color:var(--line);color:var(--txt);background:var(--panel2)}
+.btn{font-family:'Spline Sans Mono';font-size:12px;padding:8px 13px;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:9px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{border-color:var(--dim);color:var(--txt);background:var(--panel2)}
+.btn.acid{border-color:var(--acid);color:var(--acid);background:var(--thumb)}
+.btn.sm{padding:6px 10px;font-size:11px}
+
+/* synthetic banner — ecosystem amber */
+.synbanner{display:flex;align-items:center;gap:8px;background:linear-gradient(90deg,rgba(255,179,71,.08),transparent);border:1px solid rgba(255,179,71,.22);border-radius:9px;padding:8px 13px;margin-bottom:16px;font-size:12px;color:var(--amber)}
+.synbanner b{font-weight:600}
+
+/* operation filter */
+.opfilter{margin-bottom:11px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font-family:'Spline Sans Mono';font-size:11.5px;padding:7px 12px;border:1px solid var(--line);border-radius:9px;color:var(--muted);background:var(--panel);cursor:pointer;transition:.15s;user-select:none;white-space:nowrap}
+.chip:hover{border-color:var(--dim);color:var(--txt)}
+.chip.on{border-color:var(--acid);color:var(--acid);background:var(--thumb)}
+.filterbar{background:var(--panel3);border:1px solid var(--line2);border-radius:11px;margin-bottom:18px;overflow:hidden}
+.filterhead{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;user-select:none}
+.filterhead .k{flex:1}
+.filterhead .caret{transition:transform .25s;color:var(--dim)}
+.filterbar.open .caret{transform:rotate(180deg)}
+.filterbody{display:none;padding:0 14px 14px;flex-direction:column;gap:13px}
+.filterbar.open .filterbody{display:flex}
+.frow{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.frow > .k{min-width:62px}
+.search{flex:1;min-width:160px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 12px;color:var(--txt);font-family:'Archivo';font-size:13px}
+.search:focus{outline:none;border-color:var(--acid)}
+.pill{font-family:'Spline Sans Mono';font-size:10px;padding:4px 9px;border-radius:6px;background:var(--line2);color:var(--muted)}
+
+/* tabs */
+.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-bottom:22px;overflow-x:auto}
+.tab{padding:0 0 11px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:'Archivo';font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap;transition:.15s}
+.tab:hover{color:var(--txt)}
+.tab.on{color:var(--txt);border-bottom-color:var(--acid)}
+
+/* cards / metrics */
+.grid{display:grid;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px 17px;box-shadow:var(--shadow)}
+.metric{background:var(--panel2);border-radius:11px;padding:13px 15px}
+.metric .v{font-family:'Spline Sans Mono';font-size:23px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+.metric .v small{font-size:12px;color:var(--dim)}
+.metric .d{font-family:'Spline Sans Mono';font-size:10px;margin-top:2px}
+.up{color:var(--teal)} .down{color:var(--amber)} .flat{color:var(--muted)} .danger{color:var(--red)}
+.v.acid{color:var(--acid)} .v.amber{color:var(--amber)} .v.red{color:var(--red)} .v.teal{color:var(--teal)} .v.blue{color:var(--blue)}
+.sectitle{display:flex;justify-content:space-between;align-items:baseline;margin:24px 0 11px;flex-wrap:wrap;gap:8px}
+.sectitle h2{font-family:'Fraunces';font-weight:600;font-size:18px}
+.sectitle .k{text-transform:none;letter-spacing:0}
+
+/* insight */
+.insight{display:flex;align-items:flex-start;gap:9px;background:var(--panel3);border:1px solid var(--line2);border-radius:11px;padding:11px 14px;margin-bottom:16px;font-size:12.5px;color:var(--muted)}
+.insight b{color:var(--txt);font-weight:500}
+.insight .idot{color:var(--acid)}
+
+/* aging bars */
+.agebar{display:flex;flex-direction:column;gap:11px;margin-top:6px}
+.agerow{display:grid;grid-template-columns:66px 1fr 66px;align-items:center;gap:12px}
+.agerow .lbl{font-family:'Spline Sans Mono';font-size:10.5px;color:var(--muted)}
+.agerow .track{height:28px;background:var(--line2);border-radius:7px;overflow:hidden;position:relative}
+.agerow .fill{height:100%;border-radius:7px;display:flex;align-items:center;padding-left:10px;font-family:'Spline Sans Mono';font-size:10.5px;font-weight:600;color:#0a0c10;transition:width .5s cubic-bezier(.4,0,.2,1);white-space:nowrap}
+.agerow .amt{font-family:'Spline Sans Mono';font-size:11px;text-align:right;font-weight:600}
+.chartwrap{position:relative;width:100%}
+.grid2{display:grid;grid-template-columns:1.5fr 1fr;gap:16px}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+.heat{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:4px}
+.heatcell{border-radius:10px;padding:12px 13px;border:1px solid var(--line);background:var(--panel2)}
+.heatcell .dk{font-family:'Spline Sans Mono';font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.heatcell .hv{font-size:17px;font-weight:600;font-family:'Spline Sans Mono';margin-top:5px}
+.heatcell .hd{font-family:'Spline Sans Mono';font-size:9.5px;color:var(--muted);margin-top:3px}
+.toplist{font-family:'Spline Sans Mono';font-size:11px;color:var(--muted)}
+.toplist .row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line2);cursor:pointer;transition:color .12s}
+.toplist .row:last-child{border-bottom:none}
+.toplist .row:hover{color:var(--txt)}
+.note{font-family:'Spline Sans Mono';font-size:10px;color:var(--dim);margin-top:14px;line-height:1.65;border-top:1px solid var(--line);padding-top:12px}
+.tt{border-bottom:1px dotted var(--dim);cursor:help}
+
+/* worklist table */
+.tablewrap{border:1px solid var(--line);border-radius:13px;overflow:hidden;box-shadow:var(--shadow)}
+.gscroll{overflow-x:auto}
+table.lt{width:100%;border-collapse:collapse;font-size:13px;min-width:680px}
+table.lt thead th{position:sticky;top:0;background:var(--panel3);font-family:'Spline Sans Mono';font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);text-align:left;padding:11px 14px;cursor:pointer;user-select:none;border-bottom:1px solid var(--line);z-index:2;white-space:nowrap}
+table.lt thead th.num,table.lt td.num{text-align:right;font-variant-numeric:tabular-nums;font-family:'Spline Sans Mono'}
+table.lt thead th .arr{opacity:.4;font-size:9px}
+table.lt thead th.sorted .arr{opacity:1;color:var(--acid)}
+table.lt tbody td{padding:11px 14px;border-bottom:1px solid var(--line2);vertical-align:middle}
+table.lt tbody tr:last-child td{border-bottom:none}
+table.lt tbody tr:hover{background:var(--panel2)}
+.acct{font-weight:500;font-size:13px}
+.meta{font-family:'Spline Sans Mono';font-size:9.5px;color:var(--dim);margin-top:3px}
+.scorebar{display:flex;align-items:center;gap:9px}
+.scorebar .bar{height:6px;border-radius:3px;flex:0 0 auto;min-width:8px;transition:width .4s}
+.scorebar .sv{font-family:'Spline Sans Mono';font-size:11px;font-weight:600;width:24px}
+.prio{font-family:'Spline Sans Mono';font-size:9px;letter-spacing:.04em;padding:4px 9px;border-radius:6px;text-transform:uppercase;font-weight:600;white-space:nowrap;display:inline-block}
+.prio.call{background:rgba(255,107,94,.13);color:var(--red)}
+.prio.remind{background:rgba(255,179,71,.12);color:var(--amber)}
+.prio.escal{background:rgba(184,157,255,.13);color:var(--violet)}
+.prio.dispute{background:rgba(110,168,255,.12);color:var(--blue)}
+.prio.p2p{background:rgba(93,202,165,.12);color:var(--teal)}
+
+/* forecast horizon */
+.hsw{display:flex;gap:3px;background:var(--line2);border:1px solid var(--line);border-radius:9px;padding:3px}
+.hsw button{font-family:'Spline Sans Mono';font-size:11px;padding:7px 15px;border:none;background:transparent;color:var(--muted);border-radius:6px;cursor:pointer;font-weight:600;transition:.12s}
+.hsw button.on{background:var(--acid-fill);color:#0a0c10}
+.hsw button:hover:not(.on){color:var(--txt)}
+.clegend{display:flex;gap:16px;flex-wrap:wrap;font-family:'Spline Sans Mono';font-size:10.5px;color:var(--muted);margin-bottom:11px}
+.clegend i{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:0}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+.overlay.show{display:flex}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:15px;max-width:560px;width:100%;max-height:86vh;overflow:auto;box-shadow:var(--shadow)}
+.modal header{padding:18px 20px 0;display:flex;justify-content:space-between;align-items:flex-start}
+.modal h3{font-family:'Fraunces';font-size:19px;font-weight:600}
+.modal .body{padding:16px 20px 20px}
+.maprow{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center;margin-bottom:9px}
+.maprow label{font-size:12.5px;color:var(--muted)}
+.maprow .req{color:var(--amber)}
+.drop{border:1.5px dashed var(--line);border-radius:11px;padding:24px;text-align:center;color:var(--muted);font-family:'Spline Sans Mono';font-size:12px;cursor:pointer;transition:.14s;margin-bottom:14px}
+.drop:hover{border-color:var(--acid);color:var(--txt);background:var(--thumb)}
+
+.footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);font-family:'Spline Sans Mono';font-size:11px;color:var(--dim);line-height:1.7}
+.hide{display:none !important}
+@media(max-width:560px){.wrap{padding:16px 14px 60px}.maprow{grid-template-columns:1fr}}
+
+
+
+/* ===== Ecosystem footer bar ===== */
+.ecobar{max-width:1180px;margin:48px auto 0;padding:22px 26px 30px;border-top:1px solid var(--line)}
+.eco-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.eco-kicker{font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--acid,#c4f042)}
+.eco-tag{font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--dim,#5f6877)}
+.eco-chain{display:flex;align-items:stretch;flex-wrap:wrap;gap:6px}
+.eco-step{display:flex;flex-direction:column;gap:2px;padding:9px 13px;border:1px solid var(--line);border-radius:10px;text-decoration:none;background:var(--panel,#12161d);transition:.15s;min-width:0}
+a.eco-step:hover{border-color:var(--acid-dim,#8aa82e);transform:translateY(-1px)}
+.eco-on{border-color:var(--acid,#c4f042);background:linear-gradient(180deg,rgba(196,240,66,.06),transparent)}
+.eco-stage{font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim,#5f6877)}
+.eco-on .eco-stage{color:var(--acid,#c4f042)}
+.eco-name{font-size:12.5px;font-weight:600;color:var(--muted,#8a93a3);white-space:nowrap}
+.eco-on .eco-name{color:var(--txt,#e6e9ef)}
+.eco-arrow{display:flex;align-items:center;color:var(--dim,#5f6877);font-size:13px;padding:0 1px}
+.eco-foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:16px;font-family:'Spline Sans Mono',monospace;font-size:10.5px;color:var(--dim,#5f6877)}
+.eco-foot a{color:var(--blue,#6ea8ff);text-decoration:none}
+@media(max-width:640px){.eco-arrow{display:none}.eco-step{flex:1;min-width:120px}}
+
+</style>
+</head>
+<body>
+<h2 class="sr-only">Revenue Cockpit — regional revenue and sales-forecast cockpit showing quota attainment by region, region and manager comparison, pipeline by stage and end-of-quarter forecast, on synthetic data.</h2>
+<div class="wrap">
+
+  <div class="appbar">
+    <div class="brand">
+      <div class="logo">R</div>
+      <div><h1>Revenue Cockpit</h1><div class="sub" id="datasrclabel">Synthetic demo data · no real records</div></div>
+    </div>
+    <div class="toprt">
+      <div class="seg" role="tablist" aria-label="Data source">
+        <button id="src-demo" class="on" type="button">Demo data</button>
+        <button id="src-upload" type="button">↑ Upload CSV</button>
+      </div>
+      <button class="btn" id="exportBtn" type="button" title="Export current view to CSV">↓ CSV</button>
+      <button class="btn" id="exportARBtn" type="button" title="Export closed-won deals as an AR-ready invoice file — upload it into AR Cockpit to see the same money as a receivable" style="border-color:var(--acid-dim,#8aa82e);color:var(--acid,#c4f042)">↓ Won deals → AR</button>
+      <button class="iconbtn" id="themeBtn" type="button" aria-label="Toggle dark / light theme">◐</button>
+    </div>
+  </div>
+
+  <div class="synbanner"><span>⚠</span><span><b>Synthetic dataset.</b> Deals, regions and quotas are randomly generated. No proprietary or real customer data is present.</span></div>
+
+  <div class="opfilter"><div class="k" style="margin-bottom:7px">Region</div><div class="chips" id="opChips"></div></div>
+
+  <div class="filterbar" id="filterbar">
+    <div class="filterhead" id="filterhead"><span class="caret">▾</span><span class="k">Filters</span><span class="pill" id="filtersummary">all markets</span></div>
+    <div class="filterbody">
+      <div class="frow"><span class="k">Markets</span><div class="chips" id="marketChips"></div></div>
+      <div class="frow"><span class="k">Account</span><input class="search" id="searchInput" placeholder="Search deal by account name…" autocomplete="off"></div>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab on" data-tab="att" role="tab">Attainment</button>
+    <button class="tab" data-tab="mgr" role="tab">By region</button>
+    <button class="tab" data-tab="pipe" role="tab">Pipeline</button>
+    <button class="tab" data-tab="fc" role="tab">Forecast</button>
+  </div>
+
+  <div id="view-att"></div>
+  <div id="view-mgr" class="hide"></div>
+  <div id="view-pipe" class="hide"></div>
+  <div id="view-fc" class="hide"></div>
+
+  <div class="footer">
+    // Revenue Cockpit · client-side single-file app · runs on GitHub Pages with no backend<br>
+    // Synthetic Q3 pipeline · 4 sales regions (Madrid · Berlin · Warsaw · Dublin) across 10 markets (Aurelia … Jorvik) · €12M quarterly quota · week 9 of 13<br>
+    // Metrics: attainment vs quota · win-rate · sales cycle · pipeline coverage · commit/best/worst forecast · shares the universe, regions and seed of the Performance Tracker, Shift Planner, Ticket Triage &amp; AR Cockpit
+  </div>
+</div>
+
+<div class="overlay" id="mapOverlay">
+  <div class="modal">
+    <header><h3>Import your CRM export</h3><button class="iconbtn" id="mapClose" aria-label="Close">✕</button></header>
+    <div class="body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px">Drop a CSV from your CRM (deals / opportunities). Account, amount and stage are required; the cockpit recomputes attainment, pipeline and forecast on your own deals. Nothing leaves your browser.</p>
+      <div class="drop" id="drop">↑ Click to choose a CSV, or drop it here</div>
+      <div id="mapArea" class="hide"><div class="k" style="margin-bottom:9px">Map your columns</div><div id="mapRows"></div></div>
+      <div id="mapMsg" style="font-size:12px;color:var(--red);margin-top:6px"></div>
+      <div style="display:flex;gap:9px;margin-top:16px">
+        <button class="btn acid hide" id="mapApply" type="button">Apply &amp; recompute</button>
+        <button class="btn" id="mapCancel" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<input type="file" id="fileInput" accept=".csv,.tsv,.txt" class="hide">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+"use strict";
+/* ============================================================
+   REVENUE COCKPIT — data core
+   Shares the ecosystem universe (4 hubs as sales regions, 10
+   fictional markets Aurelia…Jorvik, mulberry32 seed, Jun-6-2026
+   anchor). Its entities are sales deals / opportunities — the
+   commercial side of the company, distinct from support agents
+   and AR accounts. Each deal lives in a market, owned by a region.
+   ============================================================ */
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+const OPS=[
+  {id:'mad',name:'Madrid',flag:'🇪🇸',region:'Iberia'},
+  {id:'ber',name:'Berlin',flag:'🇩🇪',region:'DACH'},
+  {id:'waw',name:'Warsaw',flag:'🇵🇱',region:'CEE'},
+  {id:'dub',name:'Dublin',flag:'🇮🇪',region:'UK & Ireland'},
+];
+const MARKETS=[
+  {code:'AUR',name:'Aurelia'},{code:'BOR',name:'Borealis'},{code:'CAL',name:'Caldera'},
+  {code:'DOR',name:'Doravia'},{code:'ELD',name:'Eldmark'},{code:'FEN',name:'Fennmark'},
+  {code:'GRA',name:'Granvik'},{code:'HAL',name:'Hallowe'},{code:'IRO',name:'Ironholt'},
+  {code:'JOR',name:'Jorvik'}
+];
+const DESK_MARKETS={
+  mad:['AUR','CAL','DOR'], ber:['ELD','FEN','BOR'], waw:['GRA','IRO','JOR'], dub:['HAL','BOR','FEN']
+};
+const SEED=20260606;
+
+/* regional managers — one per desk (the 4 the director oversees) */
+const MANAGERS={mad:'Lucia Romero',ber:'Maximilian Kohler',waw:'Jakub Nowak',dub:'Sean Doyle'};
+
+/* deal account names — neutral fictional corporates, anchored to markets */
+const ACCT=['Halcyon','Northwind','Vela','Pioneer','Brightwell','Meridian','Cobalt','Aurora','Lattice','Quanta',
+  'Helix','Ardent','Beacon','Solstice','Verdant','Cipher','Tessera','Nimbus','Onyx','Pallas','Riverstone','Sable',
+  'Targa','Umbra','Vantage','Westcliff','Xenon','Yardley','Zephyr','Anvil','Cascade','Drift','Ember','Forge',
+  'Granite','Harbor','Inkwell','Juniper','Keystone','Lumen','Marble','Novva','Orbit','Pinnacle','Quarry','Ridge'];
+const SUF=['Systems','Data','Cloud','Labs','Holdings','Group','Industries','Networks','Partners','Tech','Foods','Media','Capital'];
+const STAGES=['Qualified','Discovery','Proposal','Negotiation','Closing'];
+const STAGE_PROB={Qualified:0.18,Discovery:0.35,Proposal:0.55,Negotiation:0.74,Closing:0.90};
+
+/* quarter setup: 13-week quarter, currently week 9 */
+const QUARTER_WEEKS=13, CURRENT_WEEK=9;
+/* per-region quarterly quota (sums to 12.0M) */
+const QUOTA={mad:3.1e6,ber:4.0e6,waw:2.7e6,dub:2.2e6};
+
+function generateData(){
+  const r=mulberry32(SEED);
+  const deals=[];let id=0;
+  /* closed-won bookings to date + open pipeline per region */
+  OPS.forEach(op=>{
+    const dm=DESK_MARKETS[op.id];
+    /* region performance multiplier — Berlin deliberately lagging (the story) */
+    const perf={mad:0.97,ber:0.44,waw:0.71,dub:0.96}[op.id];
+    const quota=QUOTA[op.id];
+    /* closed-won to date: perf × (elapsed fraction) × quota, with noise */
+    const elapsedFrac=CURRENT_WEEK/QUARTER_WEEKS;
+    let closedTarget=quota*perf*elapsedFrac/0.7; // /0.7 so on-pace regions land near quota by EOQ
+    let closed=0;
+    while(closed<closedTarget){
+      const mkt=dm[Math.floor(r()*dm.length)];
+      const mObj=MARKETS.find(m=>m.code===mkt);
+      const sizeRoll=r();
+      const amt=sizeRoll>0.9?80000+r()*180000:sizeRoll>0.6?30000+r()*70000:8000+r()*40000;
+      deals.push({id:'D'+(id++),account:ACCT[id%ACCT.length]+' '+SUF[Math.floor(r()*SUF.length)],
+        desk:op.id,deskName:op.name,region:op.region,flag:op.flag,market:mkt,marketName:mObj.name,
+        amount:Math.round(amt),stage:'Closed Won',prob:1,won:true,
+        ageWeeks:Math.floor(r()*CURRENT_WEEK),stalledWeeks:0});
+      closed+=amt;
+    }
+    /* open pipeline: sized so total coverage on the gap is a realistic ~3x.
+       Lagging regions carry proportionally more (deals that won't close). */
+    const pipeMult={mad:0.85,ber:1.25,waw:1.0,dub:0.75}[op.id];
+    let pipeTarget=quota*pipeMult*0.62;
+    let pipe=0;
+    while(pipe<pipeTarget){
+      const mkt=dm[Math.floor(r()*dm.length)];
+      const mObj=MARKETS.find(m=>m.code===mkt);
+      const stage=STAGES[Math.floor(r()*STAGES.length)];
+      const sizeRoll=r();
+      const amt=sizeRoll>0.9?80000+r()*200000:sizeRoll>0.6?30000+r()*80000:8000+r()*45000;
+      /* lagging region deals stall more */
+      const stallChance={mad:0.10,ber:0.34,waw:0.20,dub:0.09}[op.id];
+      const stalled=r()<stallChance?(3+Math.floor(r()*5)):0;
+      deals.push({id:'D'+(id++),account:ACCT[id%ACCT.length]+' '+SUF[Math.floor(r()*SUF.length)],
+        desk:op.id,deskName:op.name,region:op.region,flag:op.flag,market:mkt,marketName:mObj.name,
+        amount:Math.round(amt),stage,prob:STAGE_PROB[stage],won:false,
+        ageWeeks:Math.floor(r()*10),stalledWeeks:stalled});
+      pipe+=amt;
+    }
+  });
+  return deals;
+}
+
+function deskAgg(deals,deskFilter,mktFilter){
+  const f=d=>(!deskFilter||!deskFilter.size||deskFilter.has(d.desk))&&(!mktFilter||!mktFilter.size||mktFilter.has(d.market));
+  const out={};
+  OPS.forEach(op=>{
+    if(deskFilter&&deskFilter.size&&!deskFilter.has(op.id))return;
+    const dd=deals.filter(d=>d.desk===op.id&&f(d));
+    const won=dd.filter(d=>d.won);
+    const open=dd.filter(d=>!d.won);
+    const closed=won.reduce((s,d)=>s+d.amount,0);
+    const quota=QUOTA[op.id];
+    const pipeline=open.reduce((s,d)=>s+d.amount,0);
+    const weighted=open.reduce((s,d)=>s+d.amount*d.prob,0);
+    /* win-rate: won / (won + lost-equivalent); synthesize from perf */
+    const wr={mad:0.31,ber:0.18,waw:0.24,dub:0.28}[op.id];
+    const cycle={mad:42,ber:71,waw:58,dub:39}[op.id];
+    const avgDeal=won.length?closed/won.length:0;
+    out[op.id]={op,closed,quota,attainment:closed/quota,pipeline,weighted,wr,cycle,avgDeal,
+      wonCount:won.length,openCount:open.length,manager:MANAGERS[op.id]};
+  });
+  return out;
+}
+
+function pipelineByStage(deals,deskFilter,mktFilter){
+  const f=d=>!d.won&&(!deskFilter||!deskFilter.size||deskFilter.has(d.desk))&&(!mktFilter||!mktFilter.size||mktFilter.has(d.market));
+  const open=deals.filter(f);
+  const byStage={};
+  STAGES.forEach(s=>byStage[s]={value:0,count:0});
+  open.forEach(d=>{byStage[d.stage].value+=d.amount;byStage[d.stage].count++;});
+  return {byStage,total:open.reduce((s,d)=>s+d.amount,0)};
+}
+function stalledDeals(deals,deskFilter,mktFilter){
+  const f=d=>!d.won&&d.stalledWeeks>0&&(!deskFilter||!deskFilter.size||deskFilter.has(d.desk))&&(!mktFilter||!mktFilter.size||mktFilter.has(d.market));
+  return deals.filter(f).sort((a,b)=>b.amount-a.amount);
+}
+
+/* forecast: cumulative bookings to EOQ. Closed-won to date plus the share of
+   weighted pipeline realistically expected to close before quarter-end.
+   commit/best/worst diverge by how much of that expected close actually lands. */
+function forecast(deals,deskFilter,mktFilter){
+  const agg=deskAgg(deals,deskFilter,mktFilter);
+  const closed=Object.values(agg).reduce((s,a)=>s+a.closed,0);
+  const weighted=Object.values(agg).reduce((s,a)=>s+a.weighted,0);
+  const quota=Object.values(agg).reduce((s,a)=>s+a.quota,0);
+  const remaining=QUARTER_WEEKS-CURRENT_WEEK;
+  /* only a fraction of weighted pipeline closes within the remaining weeks of THIS quarter
+     (the rest slips to next quarter). ~62% of weighted lands in-quarter at commit. */
+  const inQuarterClose=weighted*0.62;
+  const labels=[],commit=[],best=[],worst=[];
+  let cC=0,cB=0,cW=0;
+  for(let w=1;w<=QUARTER_WEEKS;w++){
+    labels.push('W'+w);
+    if(w<=CURRENT_WEEK){
+      const v=closed*(w/CURRENT_WEEK);
+      cC=v;cB=v;cW=v;
+    }else{
+      const step=(remaining>0)?(inQuarterClose/remaining):0;
+      cC+=step*1.00;   // commit (base)
+      cB+=step*1.22;   // best case — more of pipeline lands
+      cW+=step*0.70;   // worst case — slippage
+    }
+    commit.push(cC/1e6);best.push(cB/1e6);worst.push(cW/1e6);
+  }
+  return {labels,commit,best,worst,quota:quota/1e6,
+    commitEOQ:commit[commit.length-1],bestEOQ:best[best.length-1],worstEOQ:worst[worst.length-1],
+    closed:closed/1e6,currentWeek:CURRENT_WEEK};
+}
+
+function eur(n){if(Math.abs(n)>=1e6)return'€'+(n/1e6).toFixed(1)+'M';if(Math.abs(n)>=1e3)return'€'+Math.round(n/1e3)+'k';return'€'+Math.round(n);}
+function pct(n){return Math.round(n*100)+'%';}
+
+
+/* state */
+let STATE={deals:null,source:'demo'};
+let FILTER={ops:new Set(),markets:new Set(),search:''};
+let activeTab='att';
+let charts={};
+const LS_THEME='rev-theme';
+
+const fmt=n=>Math.round(n).toLocaleString('en-US');
+function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue('--'+n).trim();}
+function deskName(id){return OPS.find(o=>o.id===id).name;}
+function deskFlag(id){return OPS.find(o=>o.id===id).flag;}
+
+function visibleDeals(){
+  return STATE.deals.filter(d=>{
+    if(FILTER.ops.size&&!FILTER.ops.has(d.desk))return false;
+    if(FILTER.markets.size&&!FILTER.markets.has(d.market))return false;
+    if(FILTER.search&&!d.account.toLowerCase().includes(FILTER.search))return false;
+    return true;
+  });
+}
+
+function rebuild(deals,source){
+  STATE.deals=deals;STATE.source=source;
+  document.getElementById('datasrclabel').textContent=source==='demo'?'Synthetic demo data · no real records':'Your deals · '+deals.length+' (imported)';
+  setSrc(source==='demo'?'demo':'upload');
+  renderAll();
+}
+
+function renderAll(){
+  buildFilterChips();
+  ['att','mgr','pipe','fc'].forEach(t=>document.getElementById('view-'+t).classList.toggle('hide',t!==activeTab));
+  if(activeTab==='att')renderAtt();
+  if(activeTab==='mgr')renderMgr();
+  if(activeTab==='pipe')renderPipe();
+  if(activeTab==='fc')renderFc();
+}
+
+/* ============ TAB 1 — ATTAINMENT ============ */
+function renderAtt(){
+  const el=document.getElementById('view-att');
+  const agg=deskAgg(visibleDeals(),FILTER.ops,FILTER.markets);
+  const regions=Object.values(agg);
+  if(!regions.length){el.innerHTML='<div class="card" style="text-align:center;padding:40px;color:var(--muted)">No regions match these filters.</div>';return;}
+  const totClosed=regions.reduce((s,a)=>s+a.closed,0);
+  const totQuota=regions.reduce((s,a)=>s+a.quota,0);
+  const att=totClosed/totQuota;
+  const gap=totQuota-totClosed;
+  const sorted=[...regions].sort((a,c)=>c.attainment-a.attainment);
+  const maxQuota=Math.max(...regions.map(r=>r.quota));
+  const aCol=a=>a>=0.9?'var(--teal)':a>=0.65?'var(--amber)':'var(--red)';
+
+  el.innerHTML=`
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:18px">
+      <div class="metric"><div class="k">Q3 target</div><div class="v">${eur(totQuota)}</div><div class="d flat">${regions.length} region${regions.length>1?'s':''}</div></div>
+      <div class="metric"><div class="k">Closed to date</div><div class="v acid">${eur(totClosed)}</div><div class="d flat">${pct(att)} of target</div></div>
+      <div class="metric"><div class="k">Attainment</div><div class="v ${att>=0.9?'teal':att>=0.65?'amber':'red'}">${pct(att)}</div><div class="d flat">week 9 of 13</div></div>
+      <div class="metric"><div class="k">Gap to target</div><div class="v amber">${eur(gap)}</div><div class="d flat">4 weeks left</div></div>
+    </div>
+    <div class="card">
+      <div class="sectitle" style="margin:0 0 11px"><h2 style="font-size:15px">Attainment by region</h2><span class="k">closed vs quota · marker = quota</span></div>
+      <div class="agebar">
+        ${sorted.map(r=>{
+          const cw=Math.max(8,Math.round(r.closed/maxQuota*100));
+          const qx=Math.round(r.quota/maxQuota*100);
+          return `<div class="agerow" style="grid-template-columns:74px 1fr 70px"><span class="lbl">${r.op.flag} ${r.op.name}</span><div class="track"><div class="fill" style="width:${cw}%;background:${aCol(r.attainment)}">${eur(r.closed)}</div><div style="position:absolute;top:-2px;bottom:-2px;left:${qx}%;width:2px;background:var(--txt);opacity:.55"></div></div><span class="amt" style="color:${aCol(r.attainment)}">${pct(r.attainment)} att</span></div>`;
+        }).join('')}
+      </div>
+      <div class="note">// The headline question: do we make the number? Regions whose bar reaches the quota marker are on pace. The short bars with the biggest gap to their marker are where the quarter is at risk — that's where attention goes before reading any other tab.</div>
+    </div>`;
+}
+
+/* ============ TAB 2 — MANAGERS ============ */
+function renderMgr(){
+  const el=document.getElementById('view-mgr');
+  const agg=deskAgg(visibleDeals(),FILTER.ops,FILTER.markets);
+  const regions=Object.values(agg).sort((a,c)=>c.attainment-a.attainment);
+  if(!regions.length){el.innerHTML='<div class="card" style="text-align:center;padding:40px;color:var(--muted)">No regions match these filters.</div>';return;}
+  const bd=a=>a.attainment>=0.9?'rgba(93,202,165,.35)':a.attainment>=0.65?'rgba(255,179,71,.3)':'rgba(255,107,94,.35)';
+  const ac=a=>a.attainment>=0.9?'var(--teal)':a.attainment>=0.65?'var(--amber)':'var(--red)';
+  el.innerHTML=`
+    <div class="insight"><span class="idot">◆</span><div>The four regions and their managers on the <b>same yardstick</b> — attainment, win-rate, sales cycle, average deal. Identical metrics for everyone make the comparison honest: a low win-rate with a long cycle is a closing problem, not a pipeline-volume one.</div></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+      ${regions.map(r=>`<div class="card" style="border-color:${bd(r)}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div><div style="font-weight:600;font-size:14.5px">${r.op.flag} ${r.op.name}</div><div class="k" style="margin-top:2px">${r.op.region} · ${r.manager}</div></div>
+          <div style="font-family:'Spline Sans Mono';font-size:20px;font-weight:600;color:${ac(r)}">${pct(r.attainment)}</div>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line2)">
+          <div style="flex:1"><div class="k">Win-rate</div><div style="font-family:'Spline Sans Mono';font-size:14px;font-weight:600;margin-top:3px;color:${r.wr<0.2?'var(--red)':'inherit'}">${Math.round(r.wr*100)}%</div></div>
+          <div style="flex:1"><div class="k">Cycle</div><div style="font-family:'Spline Sans Mono';font-size:14px;font-weight:600;margin-top:3px;color:${r.cycle>65?'var(--red)':r.cycle>50?'var(--amber)':'inherit'}">${r.cycle}d</div></div>
+          <div style="flex:1"><div class="k">Avg deal</div><div style="font-family:'Spline Sans Mono';font-size:14px;font-weight:600;margin-top:3px">${eur(r.avgDeal)}</div></div>
+        </div>
+        <div style="font-family:'Spline Sans Mono';font-size:10px;color:var(--dim);margin-top:10px">${eur(r.closed)} closed · ${r.wonCount} won · ${r.openCount} open · ${eur(r.pipeline)} pipeline</div>
+      </div>`).join('')}
+    </div>`;
+}
+
+/* ============ TAB 3 — PIPELINE ============ */
+function renderPipe(){
+  const el=document.getElementById('view-pipe');
+  const pl=pipelineByStage(visibleDeals(),FILTER.ops,FILTER.markets);
+  const agg=deskAgg(visibleDeals(),FILTER.ops,FILTER.markets);
+  const totClosed=Object.values(agg).reduce((s,a)=>s+a.closed,0);
+  const totQuota=Object.values(agg).reduce((s,a)=>s+a.quota,0);
+  const gap=Math.max(1,totQuota-totClosed);
+  const coverage=pl.total/gap;
+  const stalled=stalledDeals(visibleDeals(),FILTER.ops,FILTER.markets);
+  const maxStage=Math.max(...STAGES.map(s=>pl.byStage[s].value),1);
+  const stageColors={Qualified:'#6ea8ff',Discovery:'#7fb3f5',Proposal:'var(--violet)',Negotiation:'var(--amber)',Closing:'var(--acid-fill)'};
+  el.innerHTML=`
+    <div class="grid2">
+      <div class="card">
+        <div class="sectitle" style="margin:0 0 11px"><h2 style="font-size:15px">Pipeline by stage</h2><span class="k">open deal value</span></div>
+        <div class="agebar">
+          ${STAGES.map(s=>{const v=pl.byStage[s].value;const w=Math.max(8,Math.round(v/maxStage*100));return `<div class="agerow" style="grid-template-columns:96px 1fr 64px"><span class="lbl">${s}</span><div class="track"><div class="fill" style="width:${w}%;background:${stageColors[s]}">${eur(v)}</div></div><span class="amt" style="color:var(--muted)">${pl.byStage[s].count} deals</span></div>`;}).join('')}
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px 14px;background:var(--panel2);border-radius:10px;border-left:2px solid ${coverage<3?'var(--amber)':'var(--acid-fill)'}">
+          <div style="font-family:'Fraunces';font-size:22px;font-weight:600;color:${coverage<3?'var(--amber)':'var(--acid)'}">${coverage.toFixed(1)}×</div>
+          <div style="font-family:'Spline Sans Mono';font-size:10.5px;color:var(--muted);line-height:1.5">Pipeline coverage on the ${eur(gap)} gap.<br>Healthy is 3–4×. ${coverage<3?'<span style="color:var(--amber)">Below target — thin.</span>':'<span style="color:var(--teal)">On target.</span>'}</div>
+        </div>
+      </div>
+      <div>
+        <div class="sectitle" style="margin:0 0 9px"><h2 style="font-size:15px">Stalled deals</h2><span class="k">no movement 21d+</span></div>
+        <div class="toplist">
+          ${stalled.length?stalled.slice(0,6).map(d=>`<div class="row"><span>${deskFlag(d.desk)} ${d.deskName} · ${d.stage}</span><span style="font-weight:600;color:${d.amount>300000?'var(--red)':'var(--amber)'}">${eur(d.amount)}</span></div>`).join(''):'<div style="color:var(--dim);font-family:Spline Sans Mono;font-size:11px;padding:10px 0">No stalled deals in this view.</div>'}
+        </div>
+        ${stalled.length?`<div class="note">// ${eur(stalled.reduce((s,d)=>s+d.amount,0))} stuck across ${stalled.length} deals. The region with the most stalled value is usually the same one failing attainment — pipeline confirms the diagnosis.</div>`:''}
+      </div>
+    </div>`;
+}
+
+/* ============ TAB 4 — FORECAST ============ */
+function renderFc(){
+  const el=document.getElementById('view-fc');
+  const fc=forecast(visibleDeals(),FILTER.ops,FILTER.markets);
+  const cPct=Math.round(fc.commitEOQ/fc.quota*100);
+  const bPct=Math.round(fc.bestEOQ/fc.quota*100);
+  const wPct=Math.round(fc.worstEOQ/fc.quota*100);
+  el.innerHTML=`
+    <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+      <div class="metric"><div class="k">Worst case</div><div class="v amber">${eur(fc.worstEOQ*1e6)}</div><div class="d flat">${wPct}% of target</div></div>
+      <div class="metric"><div class="k">Commit (base)</div><div class="v acid">${eur(fc.commitEOQ*1e6)}</div><div class="d flat">${cPct}% of target</div></div>
+      <div class="metric"><div class="k">Best case</div><div class="v teal">${eur(fc.bestEOQ*1e6)}</div><div class="d flat">${bPct}% of target</div></div>
+    </div>
+    <div class="card">
+      <div class="clegend"><span><i style="background:var(--teal)"></i>Best case</span><span><i style="background:var(--acid-fill)"></i>Commit</span><span><i style="background:var(--amber)"></i>Worst case</span><span><i style="background:var(--dim)"></i>Target ${eur(fc.quota*1e6)}</span></div>
+      <div class="chartwrap" style="height:250px"><canvas id="fcChart" role="img" aria-label="Cumulative revenue forecast over 13 weeks showing best, commit and worst scenarios against the quarterly target"></canvas></div>
+      <div class="note">// The number the director takes to the board. Commit lands at ${cPct}% — ${cPct<100?'short of target':'on target'}, crossing ${cPct<100?'below':'above'} the target line near quarter-end. Worst case ${wPct}%, best case ${bPct}%. The gap between the lines is real uncertainty; week 9 of 13, so ${13-fc.currentWeek} weeks left to close it.</div>
+    </div>`;
+  if(charts.fc)charts.fc.destroy();
+  charts.fc=new Chart(document.getElementById('fcChart'),{type:'line',data:{labels:fc.labels,datasets:[
+    {label:'Best',data:fc.best,borderColor:cssVar('teal'),backgroundColor:'rgba(93,202,165,.06)',borderWidth:1.5,tension:.2,pointRadius:0,fill:'-1'},
+    {label:'Commit',data:fc.commit,borderColor:cssVar('acid-fill'),backgroundColor:'rgba(196,240,66,.10)',borderWidth:2.5,tension:.2,pointRadius:2,pointBackgroundColor:cssVar('acid-fill'),fill:'-1'},
+    {label:'Worst',data:fc.worst,borderColor:cssVar('amber'),backgroundColor:'transparent',borderWidth:1.5,tension:.2,pointRadius:0},
+    {label:'Target',data:fc.labels.map(()=>fc.quota),borderColor:'rgba(127,135,148,.7)',borderWidth:1,borderDash:[5,4],pointRadius:0}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tt(),callbacks:{label:c=>c.dataset.label+': €'+c.parsed.y.toFixed(1)+'M'}}},
+    scales:{x:{grid:{color:cssVar('grid')},ticks:{color:cssVar('muted'),font:{family:'Spline Sans Mono',size:9.5}}},
+      y:{grid:{color:cssVar('grid')},ticks:{color:cssVar('muted'),font:{family:'Spline Sans Mono',size:10},callback:v=>'€'+v+'M'},beginAtZero:true}}}});
+}
+function tt(){return{backgroundColor:cssVar('panel'),titleColor:cssVar('txt'),bodyColor:cssVar('muted'),borderColor:cssVar('line'),borderWidth:1,padding:10,titleFont:{family:'Spline Sans Mono'},bodyFont:{family:'Spline Sans Mono'}};}
+
+/* ============ FILTERS ============ */
+function buildFilterChips(){
+  const opC=document.getElementById('opChips');
+  opC.innerHTML=`<span class="chip ${FILTER.ops.size===0?'on':''}" data-op="__all">All regions</span>`+OPS.map(o=>`<span class="chip ${FILTER.ops.has(o.id)?'on':''}" data-op="${o.id}">${o.flag} ${o.name}</span>`).join('');
+  opC.querySelectorAll('[data-op]').forEach(c=>c.onclick=()=>{const v=c.dataset.op;if(v==='__all')FILTER.ops.clear();else{FILTER.ops.has(v)?FILTER.ops.delete(v):FILTER.ops.add(v);}renderAll();});
+  const mk=document.getElementById('marketChips');
+  if(mk.dataset.built!=='1'){mk.dataset.built='1';
+    mk.innerHTML=MARKETS.map(m=>`<span class="chip ${FILTER.markets.has(m.code)?'on':''}" data-mk="${m.code}" title="${m.name}">${m.code}</span>`).join('');
+    mk.querySelectorAll('[data-mk]').forEach(c=>c.onclick=()=>{const v=c.dataset.mk;FILTER.markets.has(v)?FILTER.markets.delete(v):FILTER.markets.add(v);c.classList.toggle('on');updateFilterSummary();renderAll();});}
+  updateFilterSummary();
+}
+function updateFilterSummary(){document.getElementById('filtersummary').textContent=FILTER.markets.size?FILTER.markets.size+' markets':'all markets';}
+
+/* ============ CSV IMPORT ============ */
+/* ===== ECOSYSTEM CSV ENGINE (shared robust parser) ===== */
+function ECSV_cleanHeader(h){return (h==null?'':String(h)).replace(/^\uFEFF/,'').trim();}
+function ECSV_num(raw){
+  if(raw==null)return null;let s=String(raw).trim();if(!s)return null;
+  s=s.replace(/[^\d.,\-]/g,'');if(!s||s==='-'||s==='.')return null;
+  const dot=s.includes('.'),com=s.includes(',');
+  if(dot&&com){if(s.lastIndexOf(',')>s.lastIndexOf('.'))s=s.replace(/\./g,'').replace(',','.');else s=s.replace(/,/g,'');}
+  else if(com){const p=s.split(',');if(p.length===2&&p[1].length<=2)s=s.replace(',','.');else s=s.replace(/,/g,'');}
+  const v=parseFloat(s);return isNaN(v)?null:v;
+}
+const HINTS={account:['account','customer','deal','opportunity','name','company'],amount:['amount','value','size','acv','arr','revenue','total'],stage:['stage','phase','status','step'],region:['region','desk','territory','market','area'],won:['won','closed','status']};
+const FIELDS=[['account','Account / deal name',true],['amount','Deal amount',true],['stage','Stage',true],['region','Region / territory',false],['won','Won/closed flag',false]];
+let parsedCSV=null;
+function detectCol(headers,key){for(const h of headers){const lo=h.toLowerCase();for(const hint of HINTS[key])if(lo.includes(hint))return h;}return '';}
+function handleFile(file){
+  Papa.parse(file,{header:true,skipEmptyLines:true,transformHeader:ECSV_cleanHeader,complete:res=>{
+    if(!res.data||!res.data.length){document.getElementById('mapMsg').textContent='Empty or unreadable file.';return;}
+    parsedCSV={rows:res.data,headers:res.meta.fields||Object.keys(res.data[0])};
+    const det={};FIELDS.forEach(([k])=>det[k]=detectCol(parsedCSV.headers,k));
+    document.getElementById('mapRows').innerHTML=FIELDS.map(([k,l,req])=>`<div class="maprow"><label>${l} ${req?'<span class="req">*</span>':''}</label><select class="search" data-f="${k}" style="min-width:0"><option value="">— none —</option>${parsedCSV.headers.map(h=>`<option value="${h}" ${det[k]===h?'selected':''}>${h}</option>`).join('')}</select></div>`).join('');
+    document.getElementById('mapArea').classList.remove('hide');
+    document.getElementById('mapApply').classList.remove('hide');
+    document.getElementById('mapMsg').textContent='';
+  },error:()=>{document.getElementById('mapMsg').textContent='Could not parse the CSV.';}});
+}
+function applyMapping(){
+  const map={};document.querySelectorAll('#mapRows select[data-f]').forEach(s=>map[s.dataset.f]=s.value);
+  if(!map.account||!map.amount||!map.stage){document.getElementById('mapMsg').textContent='Account, amount and stage are required.';return;}
+  try{
+    const STAGE_PROB={Qualified:0.18,Discovery:0.35,Proposal:0.55,Negotiation:0.74,Closing:0.90};
+    const deals=[];let id=0;
+    const regionMap={};let rIdx=0;
+    let omitted=0;const reasons={badAmount:0,noAccount:0};
+    parsedCSV.rows.forEach(r=>{
+      const account=(r[map.account]||'').toString().trim();if(!account){omitted++;reasons.noAccount++;return;}
+      const amount=ECSV_num(r[map.amount]);if(amount===null){omitted++;reasons.badAmount++;return;}
+      let stage=(r[map.stage]||'').toString().trim();
+      const wonRaw=(map.won?(r[map.won]||''):'').toString().toLowerCase();
+      const won=/won|closed.?won|win/.test(wonRaw)||/closed.?won|won/.test(stage.toLowerCase());
+      const matched=STAGES.find(s=>stage.toLowerCase().includes(s.toLowerCase()))||'Qualified';
+      const regionRaw=map.region?(r[map.region]||'').toString().trim():'';
+      let desk;
+      if(regionRaw){if(!regionMap[regionRaw]){regionMap[regionRaw]=OPS[rIdx%4].id;rIdx++;}desk=regionMap[regionRaw];}
+      else desk=OPS[account.length%4].id;
+      deals.push({id:'IM'+(id++),account,desk,deskName:deskName(desk),region:OPS.find(o=>o.id===desk).region,flag:deskFlag(desk),market:'—',marketName:regionRaw||'Imported',amount:Math.round(amount),stage:won?'Closed Won':matched,prob:won?1:STAGE_PROB[matched],won,ageWeeks:0,stalledWeeks:0});
+    });
+    if(!deals.length){document.getElementById('mapMsg').textContent='No valid rows after mapping.';return;}
+    FILTER={ops:new Set(),markets:new Set(),search:''};
+    document.getElementById('marketChips').dataset.built='';
+    document.getElementById('mapOverlay').classList.remove('show');
+    rebuild(deals,'csv');
+    ECSV_revBanner(omitted,reasons);
+  }catch(e){document.getElementById('mapMsg').textContent='Error: '+e.message;}
+}
+function ECSV_revBanner(omitted,reasons){
+  let el=document.getElementById('csvBanner');
+  if(!omitted){if(el)el.remove();return;}
+  if(!el){el=document.createElement('div');el.id='csvBanner';const wrap=document.querySelector('.wrap')||document.body;wrap.insertBefore(el,wrap.children[1]||null);}
+  el.style.cssText='margin:12px 0;padding:10px 14px;border-radius:9px;font-size:13px;background:rgba(255,179,71,.10);border:1px solid rgba(255,179,71,.35);color:var(--amber);font-family:Spline Sans Mono,monospace';
+  const bits=[];if(reasons.badAmount)bits.push(reasons.badAmount+' with an unreadable amount');if(reasons.noAccount)bits.push(reasons.noAccount+' with no account name');
+  el.innerHTML='⚠ '+omitted+' row'+(omitted>1?'s':'')+' skipped ('+bits.join(', ')+').<button onclick="this.parentElement.remove()" style="background:none;border:none;color:inherit;cursor:pointer;float:right;font-size:15px;line-height:1">×</button>';
+}
+
+/* ============ EXPORT ============ */
+function exportCSV(){
+  const agg=deskAgg(visibleDeals(),FILTER.ops,FILTER.markets);
+  const lines=['region,manager,closed,quota,attainment_pct,win_rate_pct,cycle_days,pipeline'];
+  Object.values(agg).forEach(a=>lines.push(`${a.op.name},"${a.manager}",${Math.round(a.closed)},${Math.round(a.quota)},${Math.round(a.attainment*100)},${Math.round(a.wr*100)},${a.cycle},${Math.round(a.pipeline)}`));
+  const blob=new Blob([lines.join('\n')],{type:'text/csv'});const url=URL.createObjectURL(blob);
+  const el=document.createElement('a');el.href=url;el.download='revenue-cockpit.csv';el.click();URL.revokeObjectURL(url);
+}
+/* Ecosystem bridge: closed-won deals → AR-ready invoices.
+   A deal won this quarter becomes an invoice issued ageWeeks ago, on net-30 terms.
+   The output columns (account, amount, invoice date, terms) are exactly what AR Cockpit's
+   uploader auto-detects — upload this file there to see the same money as a receivable. */
+function exportToAR(){
+  const won=visibleDeals().filter(d=>d.won);
+  if(!won.length){alert('No closed-won deals in the current view to export.');return;}
+  const today=new Date();
+  const fmt=d=>d.toISOString().slice(0,10);
+  const lines=['account,amount,invoice date,terms'];
+  won.forEach(d=>{
+    const issued=new Date(today);issued.setDate(issued.getDate()-((d.ageWeeks||0)*7));
+    const acct=String(d.account).replace(/"/g,'""');
+    lines.push(`"${acct}",${Math.round(d.amount)},${fmt(issued)},30`);
+  });
+  const blob=new Blob([lines.join('\n')],{type:'text/csv'});const url=URL.createObjectURL(blob);
+  const el=document.createElement('a');el.href=url;el.download='won-deals-for-ar.csv';el.click();URL.revokeObjectURL(url);
+}
+
+/* ============ THEME + TABS + WIRE ============ */
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem(LS_THEME,t);}catch(e){}setTimeout(()=>{Object.values(charts).forEach(c=>{try{c.destroy();}catch(e){}});charts={};renderAll();},20);}
+function initTheme(){let t='dark';try{t=localStorage.getItem(LS_THEME)||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');}catch(e){}document.documentElement.setAttribute('data-theme',t);}
+function setTab(t){activeTab=t;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));renderAll();}
+function setSrc(s){document.getElementById('src-demo').classList.toggle('on',s==='demo');document.getElementById('src-upload').classList.toggle('on',s==='upload');}
+function loadDemo(){FILTER={ops:new Set(),markets:new Set(),search:''};document.getElementById('marketChips').dataset.built='';rebuild(generateData(),'demo');}
+
+function init(){
+  initTheme();
+  STATE.deals=generateData();
+  document.querySelectorAll('.tab').forEach(b=>{b.onclick=()=>setTab(b.dataset.tab);});
+  document.getElementById('themeBtn').onclick=()=>setTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');
+  document.getElementById('filterhead').onclick=()=>document.getElementById('filterbar').classList.toggle('open');
+  document.getElementById('searchInput').oninput=e=>{FILTER.search=e.target.value.toLowerCase();renderAll();};
+  document.getElementById('src-demo').onclick=loadDemo;
+  document.getElementById('src-upload').onclick=()=>document.getElementById('mapOverlay').classList.add('show');
+  document.getElementById('drop').onclick=()=>document.getElementById('fileInput').click();
+  document.getElementById('fileInput').onchange=e=>{if(e.target.files[0])handleFile(e.target.files[0]);e.target.value='';};
+  document.getElementById('drop').ondragover=e=>e.preventDefault();
+  document.getElementById('drop').ondrop=e=>{e.preventDefault();if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);};
+  document.getElementById('mapApply').onclick=applyMapping;
+  document.getElementById('mapCancel').onclick=()=>document.getElementById('mapOverlay').classList.remove('show');
+  document.getElementById('mapClose').onclick=()=>document.getElementById('mapOverlay').classList.remove('show');
+  document.getElementById('exportBtn').onclick=exportCSV;
+  document.getElementById('exportARBtn').onclick=exportToAR;
+  renderAll();
+}
+window.loadDemo=loadDemo;
+document.addEventListener('DOMContentLoaded',init);
+
+</script>
+
+
+<footer class="ecobar" role="navigation" aria-label="Operations ecosystem">
+  <div class="eco-head"><span class="eco-kicker">Operations ecosystem</span><span class="eco-tag">From the shift covered to the cash collected</span></div>
+  <div class="eco-chain"><a class="eco-step" href="../shift-planner/" title="Is the shift covered?"><span class="eco-stage">Capacity</span><span class="eco-name">Shift Planner</span></a><span class="eco-arrow" aria-hidden="true">→</span><a class="eco-step" href="../ticket-triage/" title="Who takes what?"><span class="eco-stage">Workflow</span><span class="eco-name">Ticket Triage</span></a><span class="eco-arrow" aria-hidden="true">→</span><a class="eco-step" href="../performance-tracker/" title="Is the team performing?"><span class="eco-stage">Productivity</span><span class="eco-name">Performance Tracker</span></a><span class="eco-arrow" aria-hidden="true">→</span><a class="eco-step" href="../customer-cockpit/" title="Does the base retain & grow?"><span class="eco-stage">Retention</span><span class="eco-name">Customer Cockpit</span></a><span class="eco-arrow" aria-hidden="true">→</span><span class="eco-step eco-on" aria-current="page" title="You are here · Will we make the number?"><span class="eco-stage">Revenue</span><span class="eco-name">Revenue Cockpit</span></span><span class="eco-arrow" aria-hidden="true">→</span><a class="eco-step" href="../ar-cockpit/" title="Did the money land?"><span class="eco-stage">Cash</span><span class="eco-name">AR Cockpit</span></a></div>
+  <div class="eco-foot"><span>One company · six functions · same hubs, markets &amp; seed</span><a href="https://github.com/sebastianvalenza" target="_blank" rel="noopener">github.com/sebastianvalenza</a></div>
+</footer>
+</body>
+</html>
